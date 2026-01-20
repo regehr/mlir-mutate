@@ -1,51 +1,45 @@
-include(AddLLVM)
+cmake_minimum_required(VERSION 3.20)
+project(llvm-tutor-hello-world)
 
-# /============================================================/
-# 1. Build object files to check warnings/errors before linking
-# /============================================================/
+#===============================================================================
+# 1. LOAD LLVM CONFIGURATION
+#===============================================================================
+# Set this to a valid LLVM installation dir
+set(LT_LLVM_INSTALL_DIR "" CACHE PATH "LLVM installation directory")
 
-set(PROJECT_OBJ "llvm-kb-analyzer-obj")
-add_library(${PROJECT_OBJ} OBJECT
-    ./utils.cpp)
+# Add the location of LLVMConfig.cmake to CMake search paths (so that
+# find_package can locate it)
+list(APPEND CMAKE_PREFIX_PATH "${LT_LLVM_INSTALL_DIR}/lib/cmake/llvm/")
 
-# Check MLIR and LLVM headers and include
-target_include_directories(${PROJECT_OBJ} PUBLIC ${LLVM_INCLUDE_DIRS})
-target_include_directories(${PROJECT_OBJ} PUBLIC ${MLIR_INCLUDE_DIRS})
-
-# Warn about unused variables
-target_compile_options(${PROJECT_OBJ} PUBLIC -Wunused-variable)
-# Using cl::opt requires this
-target_compile_options(${PROJECT_OBJ} PUBLIC -fno-rtti)
-llvm_map_components_to_libnames(llvm_libs support core irreader analysis passes transformutils scalaropts bitwriter)
-
-# Try using libc if possible
-if(USE_LIBC)
-    target_compile_options(${PROJECT_OBJ} PUBLIC -stdlib=libc++)
+find_package(LLVM CONFIG)
+if("${LLVM_VERSION_MAJOR}" VERSION_LESS 20)
+  message(FATAL_ERROR "Found LLVM ${LLVM_VERSION_MAJOR}, but need LLVM 20 or above")
 endif()
 
-# /============================================================/
-# 2. Build libllvm-kb-analyzer
-# /============================================================/
+# HelloWorld includes headers from LLVM - update the include paths accordingly
+include_directories(SYSTEM ${LLVM_INCLUDE_DIRS})
 
-set(PROJECT_LIB "llvmkbanalyzer")
-add_library(${PROJECT_LIB})
-target_link_libraries(${PROJECT_LIB} PUBLIC ${PROJECT_OBJ})
+#===============================================================================
+# 2. LLVM-TUTOR BUILD CONFIGURATION
+#===============================================================================
+# Use the same C++ standard as LLVM does
+set(CMAKE_CXX_STANDARD 17 CACHE STRING "")
 
-target_link_libraries(${PROJECT_LIB} PUBLIC ${LIB_LIST} pthread m curses ${llvm_libs})
-llvm_update_compile_flags(${PROJECT_LIB})
-
-# Try using libc if possible
-if(USE_LIBC)
-    target_link_options(${PROJECT_LIB} PUBLIC -stdlib=libc++)
+# LLVM is normally built without RTTI. Be consistent with that.
+if(NOT LLVM_ENABLE_RTTI)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti")
 endif()
 
-# /============================================================/
-# 3. Build executable
-# /============================================================/
-
-# Build executable
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+#===============================================================================
+# 3. ADD THE TARGET
+#===============================================================================
 add_executable(llvm-kb-analyzer llvm-kb-analyzer.cpp)
-target_link_libraries(llvm-kb-analyzer ${PROJECT_LIB})
 
+target_link_libraries(llvm-kb-analyzer
+  LLVMCore LLVMPasses LLVMIRReader LLVMSupport
+)
 
+# Allow undefined symbols in shared objects on Darwin (this is the default
+# behaviour on Linux)
+target_link_libraries(llvm-kb-analyzer
+  "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
