@@ -69,7 +69,7 @@ void processFile(const string &fn) {
           outs().flush();
         }
         
-        if (Ty->isIntOrIntVectorTy()) { //  || Ty->isPtrOrPtrVectorTy()) {
+        if (Ty->isIntOrIntVectorTy()) {
           auto IW = Ty->getScalarSizeInBits();
           KnownBits KB(IW);
           computeKnownBits(&I, KB, DL);
