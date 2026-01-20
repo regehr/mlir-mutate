@@ -46,10 +46,12 @@ std::unique_ptr<Module> openInputFile(const string &InputFilename) {
 
 long totalBits, totalKB;
 
-void processFile(const string &inputFile) {
-  auto M = openInputFile(inputFile);
+void processFile(const string &fn) {
+  outs() << "file: " << fn << "\n";
+    
+  auto M = openInputFile(fn);
   if (!M.get()) {
-    errs() << "Could not read input file from '" << inputFile << "'\n";
+    errs() << "Could not read input file from '" << fn << "'\n";
     return;
   }
 
@@ -57,15 +59,18 @@ void processFile(const string &inputFile) {
   for (auto &F : *M.get()) {
     for (auto &BB : F) {
       for (auto &I : BB) {
-        I.dump();
-        errs() << "\n";
-        auto Ty = I.getType(); 
+        auto Ty = I.getType();
+
+        if (false) {
+          I.print(outs());
+          outs() << "\n";        
+          Ty->print(outs());
+          outs() << "\n";
+          outs().flush();
+        }
+        
         if (Ty->isIntOrIntVectorTy()) { //  || Ty->isPtrOrPtrVectorTy()) {
-          auto IW = I.getType()->getIntegerBitWidth();
-          if (auto VTy = dyn_cast<VectorType>(Ty)) {
-            auto EC = VTy->getElementCount().getFixedValue();
-            IW *= EC;
-          }
+          auto IW = Ty->getScalarSizeInBits();
           KnownBits KB(IW);
           computeKnownBits(&I, KB, DL);
           totalBits += IW;
@@ -93,7 +98,6 @@ see alive-mutate --help for more options,
   cl::ParseCommandLineOptions(argc, argv, Usage);
 
   for (auto fn : InputFileNames) {
-    outs() << fn << "\n";
     processFile(fn);
   }
 
